@@ -1,0 +1,16 @@
+{
+  "name": "auto-js-browser-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal example for checking whether built assets contain syntax unsupported by legacy browsers.",
+  "scripts": {
+    "build": "node scripts/build-demo.js",
+    "build:minified": "npm run build && terser dist/modern-broken.js -o dist/modern-broken.min.js && terser dist/legacy-safe.js -o dist/legacy-safe.min.js",
+    "check:syntax": "es-check es2019 \"dist/**/*.js\"",
+    "ci": "npm run build:minified && npm run check:syntax"
+  },
+  "devDependencies": {
+    "es-check": "8.0.2",
+    "terser": "^5.39.0"
+  }
+}
