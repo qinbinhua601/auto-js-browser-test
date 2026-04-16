@@ -7,10 +7,19 @@
     "build": "node scripts/build-demo.js",
     "build:minified": "npm run build && terser dist/modern-broken.js -o dist/modern-broken.min.js && terser dist/legacy-safe.js -o dist/legacy-safe.min.js",
     "check:syntax": "es-check es2019 \"dist/**/*.js\"",
+    "lint:compat": "eslint runtime-demo --ext .js",
+    "lint:compat:polyfilled": "eslint runtime-demo/api-polyfilled-demo.js",
     "ci": "npm run build:minified && npm run check:syntax"
   },
+  "browserslist": [
+    "Chrome 118",
+    "Safari 13",
+    "iOS >= 14.4"
+  ],
   "devDependencies": {
     "es-check": "8.0.2",
+    "eslint": "^9.24.0",
+    "eslint-plugin-compat": "^6.0.2",
     "terser": "^5.39.0"
   }
 }
