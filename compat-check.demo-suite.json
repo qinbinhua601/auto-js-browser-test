@@ -1,0 +1,75 @@
+{
+  "simulatorName": "iPhone 17 Pro",
+  "runtimePrefix": "iOS",
+  "loadTimeoutMs": 12000,
+  "settleTimeMs": 3000,
+  "artifactDir": "artifacts/compat-check-demo-suite",
+  "screenshotOnPass": true,
+  "targets": [
+    {
+      "name": "demo-ok",
+      "type": "demo",
+      "page": "ok"
+    },
+    {
+      "name": "demo-warning-only",
+      "type": "demo",
+      "page": "warning-only"
+    },
+    {
+      "name": "demo-console-error",
+      "type": "demo",
+      "page": "console-error"
+    },
+    {
+      "name": "demo-runtime-error",
+      "type": "demo",
+      "page": "runtime-error"
+    },
+    {
+      "name": "demo-promise-rejection",
+      "type": "demo",
+      "page": "promise-rejection"
+    },
+    {
+      "name": "demo-mixed-errors",
+      "type": "demo",
+      "page": "mixed-errors"
+    },
+    {
+      "name": "demo-async-runtime-error",
+      "type": "demo",
+      "page": "async-runtime-error"
+    },
+    {
+      "name": "demo-missing-base-object",
+      "type": "demo",
+      "page": "missing-base-object"
+    },
+    {
+      "name": "demo-missing-method-call",
+      "type": "demo",
+      "page": "missing-method-call"
+    },
+    {
+      "name": "demo-missing-nested-property-call",
+      "type": "demo",
+      "page": "missing-nested-property-call"
+    },
+    {
+      "name": "demo-missing-property-read-only",
+      "type": "demo",
+      "page": "missing-property-read-only"
+    },
+    {
+      "name": "demo-caught-runtime-error",
+      "type": "demo",
+      "page": "caught-runtime-error"
+    },
+    {
+      "name": "demo-ready-never",
+      "type": "demo",
+      "page": "ready-never"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "simulatorName": "iPhone 17 Pro",
+  "runtimePrefix": "iOS",
+  "loadTimeoutMs": 20000,
+  "settleTimeMs": 3000,
+  "artifactDir": "artifacts/compat-check",
+  "screenshotOnPass": true,
+  "targets": [
+    {
+      "name": "demo-ok",
+      "type": "demo",
+      "page": "ok"
+    },
+    {
+      "name": "demo-runtime-error",
+      "type": "demo",
+      "page": "runtime-error"
+    }
+  ]
+}

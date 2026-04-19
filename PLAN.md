@@ -64,6 +64,65 @@ v1 明确不做：
 - 直接接入 CI
 - 将“无报错”扩展解释为“所有低版本兼容性都通过”
 
+## Sequence Chart
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / CI Trigger
+    participant CLI as compat-check run
+    participant Config as compat-check.config.json
+    participant Host as Host Mac Environment
+    participant Sim as iOS 14.x Simulator
+    participant DevSafari as Host Safari + Web Inspector
+    participant Page as Target Page
+    participant Result as results.json / Evidence Store
+
+    User->>CLI: Start compatibility check
+    CLI->>Config: Read runtime, deviceName, urls, timeouts, retryCount
+    CLI->>Host: Check Xcode, Simulator, 14.x runtime
+
+    alt Missing Xcode / Simulator / 14.x runtime
+        Host-->>CLI: Environment not available
+        CLI->>Result: Write run-level failure / install hint
+        CLI-->>User: Stop with environment error
+    else Environment ready
+        CLI->>Host: Resolve an existing 14.x device
+        alt No matching device
+            Host-->>CLI: Device missing
+            CLI->>Result: Write run-level infra failure
+            CLI-->>User: Stop and ask to create/install device
+        else Device found
+            CLI->>Sim: Boot selected simulator via simctl
+            Sim-->>CLI: Boot completed
+
+            loop For each configured URL
+                CLI->>Sim: Open URL in Safari via simctl openurl
+                Sim->>Page: Navigate and start loading
+                CLI->>DevSafari: Attach Web Inspector to simulator page
+
+                alt Inspector attach fails
+                    DevSafari-->>CLI: Cannot connect to page console
+                    CLI->>Result: Record INFRA_FAIL with screenshot/evidence
+                else Inspector attached
+                    CLI->>DevSafari: Switch to Console and start fresh capture window
+                    Page-->>DevSafari: Emit console logs / runtime errors
+
+                    alt Page load timeout
+                        CLI->>Result: Record INFRA_FAIL with timeout evidence
+                    else Console contains new JS errors
+                        DevSafari-->>CLI: console.error / uncaught exception / unhandled rejection / runtime error
+                        CLI->>Result: Record FAIL with console text and screenshot
+                    else Page loads and no new JS errors
+                        CLI->>Result: Record PASS
+                    end
+                end
+            end
+
+            CLI-->>User: Output aggregated PASS / FAIL / INFRA_FAIL summary
+        end
+    end
+```
+
 ## Test Plan
 必须覆盖这些场景：
 

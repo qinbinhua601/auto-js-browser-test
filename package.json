@@ -9,7 +9,11 @@
     "check:syntax": "es-check es2019 \"dist/**/*.js\"",
     "lint:compat": "eslint runtime-demo --ext .js",
     "lint:compat:polyfilled": "eslint runtime-demo/api-polyfilled-demo.js",
-    "ci": "npm run build:minified && npm run check:syntax"
+    "ci": "npm run build:minified && npm run check:syntax",
+    "compat:check": "node scripts/compat-check.js",
+    "compat:config": "node scripts/compat-check.js --print-default-config",
+    "compat:demo-suite": "node scripts/compat-check.js --config compat-check.demo-suite.json",
+    "compat:serve-demo": "node scripts/compat-demo-server.js"
   },
   "browserslist": [
     "Chrome 118",

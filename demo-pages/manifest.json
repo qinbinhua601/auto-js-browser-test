@@ -1,0 +1,55 @@
+{
+  "ok": {
+    "expectedStatus": "PASS",
+    "description": "Baseline page. No runtime error should be reported."
+  },
+  "warning-only": {
+    "expectedStatus": "PASS",
+    "description": "Uses console.warn only. Should not fail the run."
+  },
+  "console-error": {
+    "expectedStatus": "FAIL",
+    "description": "Calls console.error once after load."
+  },
+  "runtime-error": {
+    "expectedStatus": "FAIL",
+    "description": "Throws an uncaught runtime error after load."
+  },
+  "promise-rejection": {
+    "expectedStatus": "FAIL",
+    "description": "Triggers an unhandled Promise rejection."
+  },
+  "mixed-errors": {
+    "expectedStatus": "FAIL",
+    "description": "Produces both console.error and a rejected promise."
+  },
+  "async-runtime-error": {
+    "expectedStatus": "FAIL",
+    "description": "Throws asynchronously after a longer delay."
+  },
+  "missing-base-object": {
+    "expectedStatus": "FAIL",
+    "description": "Accesses a property on an undefined base object."
+  },
+  "missing-method-call": {
+    "expectedStatus": "FAIL",
+    "description": "Calls a method that does not exist on an object."
+  },
+  "missing-nested-property-call": {
+    "expectedStatus": "FAIL",
+    "description": "Reads a missing property and immediately dereferences it."
+  },
+  "missing-property-read-only": {
+    "expectedStatus": "PASS",
+    "description": "Reads a missing property only. The value is undefined, but no runtime error is thrown."
+  },
+  "caught-runtime-error": {
+    "expectedStatus": "PASS",
+    "description": "Throws inside try/catch and swallows the error, so no global runtime error is reported."
+  },
+  "ready-never": {
+    "expectedStatus": "INFRA_FAIL",
+    "description": "Never reports back. Useful to exercise timeout handling.",
+    "disableAutoReport": true
+  }
+}
