@@ -5,6 +5,14 @@
   "settleTimeMs": 3000,
   "artifactDir": "artifacts/compat-check-demo-suite",
   "screenshotOnPass": true,
+  "appium": {
+    "serverUrl": "http://127.0.0.1:4723",
+    "autoStart": true,
+    "showSafariConsoleLog": true,
+    "failOnNetworkErrors": false,
+    "webviewConnectTimeoutMs": 10000,
+    "wdaLaunchTimeoutMs": 120000
+  },
   "targets": [
     {
       "name": "demo-ok",
@@ -57,6 +65,11 @@
       "page": "missing-nested-property-call"
     },
     {
+      "name": "demo-missing-nested-property-log",
+      "type": "demo",
+      "page": "missing-nested-property-log"
+    },
+    {
       "name": "demo-missing-property-read-only",
       "type": "demo",
       "page": "missing-property-read-only"
@@ -65,11 +78,6 @@
       "name": "demo-caught-runtime-error",
       "type": "demo",
       "page": "caught-runtime-error"
-    },
-    {
-      "name": "demo-ready-never",
-      "type": "demo",
-      "page": "ready-never"
     }
   ]
 }

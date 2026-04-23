@@ -38,13 +38,11 @@
       <p>This page only reads <code>data.user.bbb</code>. The value becomes <code>undefined</code>, but no runtime error is thrown.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
           const data = { user: {} };
           const value = data.user.bbb;
           document.body.insertAdjacentHTML("beforeend", "<p>value: " + String(value) + "</p>");
-          window.__compatRuntimeReady = true;
         }, 300);
       });
     </script>

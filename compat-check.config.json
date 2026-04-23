@@ -5,6 +5,14 @@
   "settleTimeMs": 3000,
   "artifactDir": "artifacts/compat-check",
   "screenshotOnPass": true,
+  "appium": {
+    "serverUrl": "http://127.0.0.1:4723",
+    "autoStart": true,
+    "showSafariConsoleLog": true,
+    "failOnNetworkErrors": false,
+    "webviewConnectTimeoutMs": 10000,
+    "wdaLaunchTimeoutMs": 120000
+  },
   "targets": [
     {
       "name": "demo-ok",

@@ -38,12 +38,10 @@
       <p>This page produces both a <code>console.error</code> and an unhandled Promise rejection.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
           console.error("compat demo mixed console error");
           Promise.reject(new Error("compat demo mixed rejected promise"));
-          window.__compatRuntimeReady = true;
         }, 300);
       });
     </script>

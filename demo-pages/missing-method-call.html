@@ -38,12 +38,10 @@
       <p>This page calls <code>service.bbb()</code> where <code>bbb</code> does not exist.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
           const service = { ok: true };
           service.bbb();
-          window.__compatRuntimeReady = true;
         }, 300);
       });
     </script>

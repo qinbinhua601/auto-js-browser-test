@@ -39,6 +39,10 @@
     "expectedStatus": "FAIL",
     "description": "Reads a missing property and immediately dereferences it."
   },
+  "missing-nested-property-log": {
+    "expectedStatus": "FAIL",
+    "description": "Evaluates console.log(a.xxx.bbb) where the middle property is undefined."
+  },
   "missing-property-read-only": {
     "expectedStatus": "PASS",
     "description": "Reads a missing property only. The value is undefined, but no runtime error is thrown."
@@ -46,10 +50,5 @@
   "caught-runtime-error": {
     "expectedStatus": "PASS",
     "description": "Throws inside try/catch and swallows the error, so no global runtime error is reported."
-  },
-  "ready-never": {
-    "expectedStatus": "INFRA_FAIL",
-    "description": "Never reports back. Useful to exercise timeout handling.",
-    "disableAutoReport": true
   }
 }

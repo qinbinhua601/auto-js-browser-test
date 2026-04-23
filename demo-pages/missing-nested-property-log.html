@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ready-never</title>
+    <title>missing-nested-property-log</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -33,14 +33,16 @@
   </head>
   <body>
     <main class="card">
-      <h1>Demo Case: ready-never</h1>
-      <p class="meta">Expected result: <code>INFRA_FAIL</code></p>
-      <p>This page intentionally never reports back to the runner, so the check should time out.</p>
+      <h1>Demo Case: missing-nested-property-log</h1>
+      <p class="meta">Expected result: <code>FAIL</code></p>
+      <p>This page evaluates <code>console.log(a.xxx.bbb)</code> where <code>a.xxx</code> is undefined.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
-        document.body.insertAdjacentHTML("beforeend", "<p>report intentionally suppressed</p>");
+        setTimeout(() => {
+          const a = {};
+          console.log(a.xxx.bbb);
+        }, 300);
       });
     </script>
   </body>

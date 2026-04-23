@@ -38,11 +38,9 @@
       <p>This page evaluates <code>window.__compatMissingBase.bbb</code> where the base object is undefined.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
           const value = window.__compatMissingBase.bbb;
-          window.__compatRuntimeReady = Boolean(value);
         }, 300);
       });
     </script>

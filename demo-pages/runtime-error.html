@@ -38,7 +38,6 @@
       <p>This page throws an uncaught runtime error after load.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
           throw new Error("compat demo runtime error");

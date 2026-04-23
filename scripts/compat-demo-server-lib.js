@@ -51,22 +51,13 @@ function renderLayout(title, body) {
 </html>`;
 }
 
-function buildDemoHtml(slug, pageDef) {
+function buildDemoHtml(slug) {
   const filePath = path.join(DEMO_DIR, `${slug}.html`);
   if (!fs.existsSync(filePath)) {
     return buildNotFoundHtml(slug);
   }
 
-  const raw = fs.readFileSync(filePath, "utf8");
-  const scriptTag = '<script src="/compat-client.js"></script>';
-  if (raw.includes(scriptTag)) {
-    return raw;
-  }
-
-  return raw.replace(
-    "</body>",
-    `    ${scriptTag}\n  </body>`,
-  );
+  return fs.readFileSync(filePath, "utf8");
 }
 
 function buildNotFoundHtml(slug) {
@@ -79,11 +70,11 @@ function buildNotFoundHtml(slug) {
   );
 }
 
-function buildDemoCatalogHtml(serverPort) {
+function buildDemoCatalogHtml() {
   const manifest = loadDemoManifest();
   const items = Object.entries(manifest)
     .map(([slug, pageDef]) => {
-      const href = `/demo/${slug}?compat_mode=1&compat_report_url=http://127.0.0.1:${serverPort}/report&compat_run_id=manual-${slug}&compat_settle_ms=3000`;
+      const href = `/demo/${slug}`;
       return `<li><a href="${href}">${slug}</a> — expected <code>${pageDef.expectedStatus}</code> — ${pageDef.description}</li>`;
     })
     .join("\n");
@@ -92,129 +83,28 @@ function buildDemoCatalogHtml(serverPort) {
     "compat demo catalog",
     `
       <h1>compat-check demo catalog</h1>
-      <p>These pages are served by the local runner and are meant for iOS Simulator Safari checks.</p>
+      <p>These pages are served by the local runner and are meant for Appium-driven iOS Simulator Safari checks.</p>
       <ul>${items}</ul>
     `,
   );
 }
 
-function buildCompatClient() {
-  return `(() => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("compat_mode") !== "1") {
-    return;
-  }
-
-  const reportUrl = params.get("compat_report_url");
-  const runId = params.get("compat_run_id");
-  const settleTimeMs = Number(params.get("compat_settle_ms") || 3000);
-  const suppressReport = params.get("compat_disable_report") === "1";
-  const errors = [];
-  let reported = false;
-
-  window.__compatRuntimeErrors = errors;
-  window.__compatRuntimeReady = window.__compatRuntimeReady || false;
-
-  const pushError = (payload) => {
-    errors.push({
-      ...payload,
-      timestamp: new Date().toISOString(),
-    });
-  };
-
-  window.addEventListener("error", (event) => {
-    pushError({
-      type: "error",
-      message: event.message || "Unknown error",
-      source: event.filename || null,
-      line: event.lineno || null,
-      column: event.colno || null,
-      stack: event.error && event.error.stack ? String(event.error.stack) : null,
-    });
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
-    pushError({
-      type: "unhandledrejection",
-      message: event.reason ? String(event.reason) : "Unhandled promise rejection",
-      stack: event.reason && event.reason.stack ? String(event.reason.stack) : null,
-      source: null,
-      line: null,
-      column: null,
-    });
-  });
-
-  const originalConsoleError = console.error.bind(console);
-  console.error = (...args) => {
-    pushError({
-      type: "console.error",
-      message: args.map((arg) => {
-        if (typeof arg === "string") return arg;
-        try {
-          return JSON.stringify(arg);
-        } catch (error) {
-          return String(arg);
-        }
-      }).join(" "),
-      stack: null,
-      source: null,
-      line: null,
-      column: null,
-    });
-    originalConsoleError(...args);
-  };
-
-  const sendReport = async () => {
-    if (reported || !reportUrl || suppressReport) {
-      return;
-    }
-    reported = true;
-    const payload = {
-      runId,
-      href: window.location.href,
-      title: document.title,
-      userAgent: navigator.userAgent,
-      ready: Boolean(window.__compatRuntimeReady),
-      errors,
-      reportedAt: new Date().toISOString(),
-    };
-
-    try {
-      await fetch(reportUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-        keepalive: true,
-      });
-    } catch (error) {
-      originalConsoleError("compat-check report failed", error);
-    }
-  };
-
-  window.addEventListener("load", () => {
-    setTimeout(sendReport, settleTimeMs);
-  });
-})();`;
-}
-
 function startCompatServer(options = {}) {
   const port = options.port || 0;
-  const reportWaiters = new Map();
-  const reportStore = new Map();
   const manifest = loadDemoManifest();
 
   const server = http.createServer((req, res) => {
     const requestUrl = new URL(req.url, "http://127.0.0.1");
 
-    if (req.method === "GET" && requestUrl.pathname === "/compat-client.js") {
-      res.writeHead(200, { "content-type": "application/javascript; charset=utf-8" });
-      res.end(buildCompatClient());
+    if (req.method === "GET" && requestUrl.pathname === "/favicon.ico") {
+      res.writeHead(204);
+      res.end();
       return;
     }
 
     if (req.method === "GET" && requestUrl.pathname === "/demo/catalog") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(buildDemoCatalogHtml(server.address().port));
+      res.end(buildDemoCatalogHtml());
       return;
     }
 
@@ -223,29 +113,7 @@ function startCompatServer(options = {}) {
       const pageDef = manifest[slug];
       const statusCode = pageDef ? 200 : 404;
       res.writeHead(statusCode, { "content-type": "text/html; charset=utf-8" });
-      res.end(pageDef ? buildDemoHtml(slug, pageDef) : buildNotFoundHtml(slug));
-      return;
-    }
-
-    if (req.method === "POST" && requestUrl.pathname === "/report") {
-      const chunks = [];
-      req.on("data", (chunk) => chunks.push(chunk));
-      req.on("end", () => {
-        try {
-          const payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          reportStore.set(payload.runId, payload);
-          const waiter = reportWaiters.get(payload.runId);
-          if (waiter) {
-            waiter.resolve(payload);
-            reportWaiters.delete(payload.runId);
-          }
-          res.writeHead(204);
-          res.end();
-        } catch (error) {
-          res.writeHead(400, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: String(error) }));
-        }
-      });
+      res.end(pageDef ? buildDemoHtml(slug) : buildNotFoundHtml(slug));
       return;
     }
 
@@ -269,25 +137,6 @@ function startCompatServer(options = {}) {
               closeResolve();
             });
           }),
-        waitForReport(runId, timeoutMs) {
-          if (reportStore.has(runId)) {
-            return Promise.resolve(reportStore.get(runId));
-          }
-
-          return new Promise((resolveReport, rejectReport) => {
-            const timeout = setTimeout(() => {
-              reportWaiters.delete(runId);
-              rejectReport(new Error(`Timed out waiting for report ${runId}`));
-            }, timeoutMs);
-
-            reportWaiters.set(runId, {
-              resolve(payload) {
-                clearTimeout(timeout);
-                resolveReport(payload);
-              },
-            });
-          });
-        },
       });
     });
   });

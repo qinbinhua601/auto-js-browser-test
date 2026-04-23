@@ -1,67 +1,67 @@
 # Safari 模拟器自动化检测流程图
 
-这份流程图描述的是当前仓库里已经落地的实际执行链路，不是 `PLAN.md` 中早期设想的 Web Inspector 抓取方案。
+这份流程图描述的是仓库里当前唯一保留的 compat-check 方案：
 
-## 实际 CLI 命令
+- Appium 2
+- XCUITest
+- iOS Simulator Safari
+- `safariConsole` 日志采集
 
-用户入口命令：
+## CLI 入口
 
 - `npm run compat:check`
 - `npm run compat:demo-suite`
-- `npm run compat:serve-demo`
 - `npm run compat:config`
+- `npm run compat:serve-demo`
 
-Runner 内部调用的关键系统命令：
+## 关键系统调用
 
 - `xcrun simctl list devices available -j`
 - `xcrun simctl list runtimes -j`
 - `xcrun simctl boot <udid>`
 - `xcrun simctl bootstatus <udid> -b`
-- `xcrun simctl terminate <udid> com.apple.mobilesafari`
-- `xcrun simctl openurl <udid> <targetUrl>`
+- Appium `POST /session`
+- Appium `POST /session/:id/url`
+- Appium log endpoints for `safariConsole`
 - `xcrun simctl io <udid> screenshot <outputPath>`
+- `DELETE /session/:id`
 - `xcrun simctl shutdown <udid>`
 
 ## 整体流程图
 
 ```mermaid
 flowchart TD
-    A[执行 npm run compat:check<br/>或 compat:demo-suite] --> B[node scripts/compat-check.js]
-    B --> C[读取 config]
+    A[执行 compat:check 或 compat:demo-suite] --> B[node scripts/compat-check.js]
+    B --> C[读取 compat-check config]
     C --> D[xcrun simctl list devices available -j]
     D --> E[xcrun simctl list runtimes -j]
-    E --> F[选择匹配的 simulator 和 runtime]
+    E --> F[选择匹配 simulator 和 runtime]
     F --> G[xcrun simctl boot udid]
     G --> H[xcrun simctl bootstatus udid -b]
-    H --> I[启动本地 compat server]
-    I --> J[为 target 生成带 compat 参数的 URL]
+    H --> I{targets 中是否有 demo 页面?}
+    I -->|是| J[启动本地 demo server]
+    I -->|否| K[跳过 demo server]
+    J --> L[连接或拉起 Appium server]
+    K --> L
+    L --> M[创建 XCUITest Safari session]
+    M --> N[确认 safariConsole log type 可用]
 
-    J --> K[xcrun simctl terminate udid com.apple.mobilesafari]
-    K --> L[xcrun simctl openurl udid targetUrl]
-    L --> M[Simulator Safari 打开页面]
-    M --> N[页面注入 compat-client.js]
-    N --> O[监听 window error]
-    N --> P[监听 unhandledrejection]
-    N --> Q[hook console.error]
-    O --> R[load 后等待 settleTime]
-    P --> R
-    Q --> R
-    R --> S[POST /report 回传结构化结果]
-    S --> T[Runner waitForReport]
-
-    T --> U{是否收到 report?}
-    U -->|否| V[INFRA_FAIL]
-    U -->|是| W{errors.length == 0?}
-    W -->|是| X[PASS]
-    W -->|否| Y[FAIL]
-
-    Y --> Z[xcrun simctl io udid screenshot outputPath]
-    V --> AA[记录基础设施异常]
-    X --> AB[写 results.json 和 report.md]
-    Z --> AB
-    AA --> AB
-    AB --> AC[输出汇总]
-    AC --> AD[xcrun simctl shutdown udid]
+    N --> O[逐个处理 target]
+    O --> P[构造目标 URL]
+    P --> Q[清空旧的 safariConsole 缓冲]
+    Q --> R[WebDriver navigate]
+    R --> S[轮询 safariConsole 直到 settle 窗口结束]
+    S --> T[拉取 href title readyState]
+    T --> U{命中错误分类规则?}
+    U -->|是| V[FAIL]
+    U -->|否| W{导航是否异常?}
+    W -->|是| X[INFRA_FAIL]
+    W -->|否| Y[PASS]
+    V --> Z[写 screenshot + safari-console.json]
+    X --> Z
+    Y --> Z
+    Z --> AA[写 results.json 和 report.md]
+    AA --> AB[关闭 session / demo server / simulator]
 ```
 
 ## 时序图
@@ -73,10 +73,9 @@ sequenceDiagram
     participant NPM as npm script
     participant CLI as scripts/compat-check.js
     participant Simctl as xcrun simctl
-    participant Sim as iOS Simulator
-    participant Safari as MobileSafari in Simulator
-    participant Server as local compat server
-    participant Page as target page + compat-client.js
+    participant Server as local demo server
+    participant Appium as Appium server
+    participant Safari as Simulator Safari
     participant Artifacts as artifacts/compat-check
 
     User->>NPM: npm run compat:check
@@ -88,49 +87,47 @@ sequenceDiagram
     CLI->>Simctl: boot <udid>
     CLI->>Simctl: bootstatus <udid> -b
     Simctl-->>CLI: simulator ready
-    CLI->>Server: startCompatServer()
-    Server-->>CLI: listen on 127.0.0.1:<port>
+
+    alt target includes demo pages
+        CLI->>Server: startCompatServer()
+        Server-->>CLI: listen on 127.0.0.1:<port>
+    end
+
+    CLI->>Appium: ensure server reachable
+    CLI->>Appium: create Safari session
+    Appium-->>CLI: session id + capabilities
+    CLI->>Appium: detect log endpoints
 
     loop for each target
-        CLI->>CLI: build targetUrl with compat params
-        CLI->>Simctl: terminate <udid> com.apple.mobilesafari
-        CLI->>Simctl: openurl <udid> <targetUrl>
-        Simctl->>Sim: open URL in simulator
-        Sim->>Safari: launch / navigate
-        Safari->>Server: GET /demo/... or target URL
+        CLI->>CLI: build target URL
+        CLI->>Appium: clear safariConsole buffer
+        CLI->>Appium: navigate to URL
+        Appium->>Safari: open target page
+        Safari->>Server: GET /demo/... (demo targets only)
         Server-->>Safari: HTML page
-        Safari->>Server: GET /compat-client.js
-        Server-->>Safari: compat-client.js
-        Safari->>Page: execute page and compat client
-        Page->>Page: capture error / unhandledrejection / console.error
-        CLI->>Server: waitForReport(runId)
-
-        alt page reports before timeout
-            Page->>Server: POST /report
-            Server-->>CLI: resolve report payload
-            alt errors.length == 0
-                CLI->>Artifacts: write PASS result
-            else errors.length > 0
-                CLI->>Simctl: io <udid> screenshot <outputPath>
-                CLI->>Artifacts: write FAIL result + screenshot path
-            end
-        else timeout or runner exception
-            Server-->>CLI: timeout / reject
+        CLI->>Appium: read safariConsole window
+        Appium-->>CLI: console entries
+        CLI->>Appium: execute script for href/title/readyState
+        alt JS error matched
+            CLI->>Simctl: screenshot
+            CLI->>Artifacts: write FAIL result
+        else navigation failed
             CLI->>Artifacts: write INFRA_FAIL result
+        else no matched error
+            CLI->>Artifacts: write PASS result
         end
     end
 
     CLI->>Artifacts: write results.json
     CLI->>Artifacts: write report.md
+    CLI->>Appium: delete session
+    CLI->>Server: close()
     CLI->>Simctl: shutdown <udid>
-    CLI-->>User: print PASS / FAIL / INFRA_FAIL summary
 ```
 
 ## 说明
 
-- 当前实现没有接 Safari Web Inspector。
-- 错误来源是页面内注入脚本采集到的：
-  - `window error`
-  - `unhandledrejection`
-  - `console.error`
-- 结果产物默认写到 `artifacts/compat-check/`。
+- 当前实现不会给页面加 `compat_mode`
+- 当前实现不会等待页面 POST `/report`
+- 当前实现的 demo server 只负责静态提供页面和目录
+- 结果来源是 Safari console，不是页面主动上报

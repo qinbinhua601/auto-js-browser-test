@@ -1,197 +1,77 @@
 # compat-check 使用指南
 
-这份指南说明如何使用当前仓库里的 `compat-check` 工具，在 iOS Simulator 的 Safari 中打开测试页面，收集运行时错误，并输出结构化结果。
+这份指南描述的是仓库里当前唯一保留的实现：
 
-## 1. 工具能做什么
+- Appium 2
+- XCUITest driver
+- iOS Simulator Safari
+- `safariConsole` 日志采集
+- 不依赖页面注入
 
-`compat-check` 目前已经能完成这条链路：
+## 1. 当前方案做什么
 
-1. 选择并启动一个 iOS Simulator 设备
-2. 用 Safari 打开目标页面
-3. 让页面在测试态下把运行时错误回传给本地 HTTP 服务
-4. 输出 `PASS / FAIL / INFRA_FAIL`
-5. 在失败时保存截图和结果文件
+`compat-check` 会：
 
-它适合先验证“整条自动化测试链”是否可用，后续再扩展到更多 iOS runtime 或真实业务页面。
+1. 选择并启动一个 iOS Simulator
+2. 启动或连接一个 Appium server
+3. 创建 Safari session
+4. 打开目标 URL
+5. 读取 `safariConsole`
+6. 输出 `PASS / FAIL / INFRA_FAIL`
+7. 保存截图、控制台日志和结构化结果
 
-## 2. 使用前提
+结果判定基于 Safari 控制台本身，而不是页面回传。
 
-开始前请确认：
-
-- 已安装 Xcode
-- `xcode-select -p` 指向 `/Applications/Xcode.app/Contents/Developer`
-- `xcrun simctl list devices available` 能正常列出模拟器
-- 你至少有一个可用的 iPhone Simulator
-
-推荐先手动验证一次：
-
-```bash
-xcrun simctl list runtimes
-xcrun simctl list devices available
-```
-
-## 3. 目录与入口
-
-本工具的关键文件如下：
-
-- `scripts/compat-check.js`
-  运行器入口
-- `scripts/compat-demo-server.js`
-  独立 demo 服务入口
-- `demo-pages/`
-  测试页面源码，每个场景一个独立 HTML 文件
-- `compat-check.config.json`
-  最小 demo 配置
-- `compat-check.demo-suite.json`
-  完整测试态场景配置
-- `artifacts/`
-  输出目录
-
-可直接使用的 npm 命令：
+## 2. 常用命令
 
 ```bash
 npm run compat:check
 npm run compat:demo-suite
-npm run compat:serve-demo
 npm run compat:config
+npm run compat:serve-demo
 ```
 
-含义分别是：
+含义：
 
 - `compat:check`
-  跑最小 demo，只测 2 个页面
+  跑最小 demo
 - `compat:demo-suite`
-  跑完整测试态场景集
-- `compat:serve-demo`
-  单独启动 demo 页面服务，方便人工查看
+  跑完整 demo 场景
 - `compat:config`
-  打印默认配置模板
+  打印默认配置
+- `compat:serve-demo`
+  单独启动 demo 页面服务
 
-## 4. 最小跑通方式
+## 3. 使用前提
 
-在项目根目录执行：
+在开始前，请先确认：
 
-```bash
-npm install
-npm run compat:check
-```
+- `xcrun simctl list devices available -j` 能成功
+- 已安装可用的 iOS Simulator runtime
+- Appium 2 可用
+- Appium 里已安装 `xcuitest` driver
 
-默认配置会：
-
-- 使用 `iPhone 17 Pro`
-- 选择当前已安装的 `iOS` runtime
-- 跑两个页面：
-  - `demo-ok`
-  - `demo-runtime-error`
-
-你会看到类似输出：
+推荐先手动验证：
 
 ```bash
-compat-check finished
-- simulator:  iPhone 17 Pro
-- runtime:    iOS 26.3
-- artifacts:  /.../artifacts/compat-check
-- totals:     PASS 1, FAIL 1, INFRA_FAIL 0
-
-results:
-- demo-ok                  PASS       no errors
-- demo-runtime-error       FAIL       1 error
+xcrun simctl list runtimes -j
+xcrun simctl list devices available -j
+appium driver list --installed
 ```
 
-这说明：
-
-- `demo-ok` 没有错误，判定通过
-- `demo-runtime-error` 主动抛错，判定失败
-
-## 5. 完整测试态场景
-
-如果你想一次把各种错误类型都测一遍，执行：
+如果 `xcuitest` 不在安装列表里，执行：
 
 ```bash
-npm run compat:demo-suite
+appium driver install xcuitest
 ```
 
-这会运行下面这些测试页：
+## 4. 配置文件
 
-- `ok`
-  基线页，无错误，应为 `PASS`
-- `warning-only`
-  只有 `console.warn`，应为 `PASS`
-- `console-error`
-  调用 `console.error`，应为 `FAIL`
-- `runtime-error`
-  抛出未捕获异常，应为 `FAIL`
-- `promise-rejection`
-  触发未处理 Promise rejection，应为 `FAIL`
-- `mixed-errors`
-  同时触发多种错误，应为 `FAIL`
-- `async-runtime-error`
-  延迟抛错，仍应被抓到，结果为 `FAIL`
-- `missing-base-object`
-  基对象不存在，访问 `a.bbb` 一类情况，应为 `FAIL`
-- `missing-method-call`
-  方法不存在但被调用，应为 `FAIL`
-- `missing-nested-property-call`
-  缺失属性继续链式调用，应为 `FAIL`
-- `missing-property-read-only`
-  只读取不存在属性，不会报错，应为 `PASS`
-- `caught-runtime-error`
-  报错被 `try/catch` 吞掉，不会上报全局错误，应为 `PASS`
-- `ready-never`
-  故意不回传结果，用来验证超时处理，应为 `INFRA_FAIL`
+默认配置文件是 `compat-check.config.json`。
 
-## 6. Demo 测试 URL 怎么用
+完整 demo 配置是 `compat-check.demo-suite.json`。
 
-demo 页面现在已经拆成 `demo-pages/` 目录下的独立文件，便于逐个查看和维护。
-
-你有两种方式访问它们：
-
-### 方式 A：在检查流程里使用
-
-`compat-check` 运行时会临时起一个本地 HTTP 服务，并动态提供测试页面。
-
-### 方式 B：单独启动 demo 服务
-
-如果你想人工点开页面看效果，执行：
-
-```bash
-npm run compat:serve-demo
-```
-
-默认访问：
-
-```bash
-http://127.0.0.1:4173/demo/catalog
-```
-
-可用路径包括：
-
-- `/demo/catalog`
-- `/demo/ok`
-- `/demo/warning-only`
-- `/demo/console-error`
-- `/demo/runtime-error`
-- `/demo/promise-rejection`
-- `/demo/mixed-errors`
-- `/demo/async-runtime-error`
-- `/demo/missing-base-object`
-- `/demo/missing-method-call`
-- `/demo/missing-nested-property-call`
-- `/demo/missing-property-read-only`
-- `/demo/caught-runtime-error`
-- `/demo/ready-never`
-
-其中：
-
-- `/demo/catalog`
-  是一个可点击目录页
-- 其他路径都是单独测试页
-
-这些页面可以由 `compat-check` 临时启动，也可以由 `compat:serve-demo` 长时间单独提供。
-
-## 7. 配置文件怎么改
-
-最常改的是这几个字段：
+典型结构：
 
 ```json
 {
@@ -200,7 +80,15 @@ http://127.0.0.1:4173/demo/catalog
   "loadTimeoutMs": 20000,
   "settleTimeMs": 3000,
   "artifactDir": "artifacts/compat-check",
-  "screenshotOnPass": false,
+  "screenshotOnPass": true,
+  "appium": {
+    "serverUrl": "http://127.0.0.1:4723",
+    "autoStart": true,
+    "showSafariConsoleLog": true,
+    "failOnNetworkErrors": false,
+    "webviewConnectTimeoutMs": 10000,
+    "wdaLaunchTimeoutMs": 120000
+  },
   "targets": [
     {
       "name": "demo-ok",
@@ -211,28 +99,32 @@ http://127.0.0.1:4173/demo/catalog
 }
 ```
 
-字段说明：
+重点字段：
 
 - `simulatorName`
-  指定要启动的模拟器名称
+  选择哪台模拟器
 - `runtimePrefix`
-  用来筛选 runtime，当前通常填 `iOS`
+  用来筛选 runtime，通常填 `iOS`
 - `loadTimeoutMs`
-  等待页面结果回传的超时时间
+  页面导航超时
 - `settleTimeMs`
-  页面 load 后继续观察错误的窗口时长
+  页面加载后继续采集控制台的窗口
 - `artifactDir`
   输出目录
 - `screenshotOnPass`
-  是否在通过时也保存截图
-- `targets`
-  要测试的页面列表
+  是否对 `PASS` 也截图
+- `appium.serverUrl`
+  Appium server 地址
+- `appium.autoStart`
+  当 server 不可达时，是否尝试用本机 `appium` 命令自动拉起
+- `appium.failOnNetworkErrors`
+  是否把 `source=network` 的 Safari console 项也算成失败
 
-## 8. `targets` 支持什么
+## 5. `targets` 怎么写
 
-当前支持两种目标：
+支持两种写法。
 
-### 方式 A：跑内置 demo 页面
+内置 demo：
 
 ```json
 {
@@ -242,119 +134,104 @@ http://127.0.0.1:4173/demo/catalog
 }
 ```
 
-### 方式 B：跑真实业务 URL
+真实页面：
 
 ```json
 {
-  "name": "my-page",
-  "url": "https://example.com/page"
+  "name": "checkout-page",
+  "url": "https://example.com/checkout"
 }
 ```
 
-如果是方式 B，建议你的真实页面支持测试态采集逻辑，这样工具才能拿到结构化运行时错误。
+当前实现里，不需要给真实页面加 `compat_mode`、`compat_report_url` 之类参数。
 
-## 9. 结果怎么看
+## 6. Demo 页面列表
 
-每次运行都会在配置指定的 `artifactDir` 下生成结果。
+当前 demo 集合包括：
 
-常见文件有：
+- `ok`
+- `warning-only`
+- `console-error`
+- `runtime-error`
+- `promise-rejection`
+- `mixed-errors`
+- `async-runtime-error`
+- `missing-base-object`
+- `missing-method-call`
+- `missing-nested-property-call`
+- `missing-nested-property-log`
+- `missing-property-read-only`
+- `caught-runtime-error`
+
+目录页地址：
+
+```bash
+http://127.0.0.1:4173/demo/catalog
+```
+
+## 7. 结果怎么看
+
+主要产物：
 
 - `results.json`
   完整结构化结果
 - `report.md`
   摘要报告
+- `*-safari-console.json`
+  原始控制台条目
 - `*.png`
-  失败页面截图
+  页面截图
 
 状态含义：
 
 - `PASS`
-  页面成功回传，并且没有采集到错误
+  导航完成，且没有命中错误分类规则
 - `FAIL`
-  页面成功回传，但采集到了运行时错误
+  导航完成，但命中了 JavaScript 侧错误
 - `INFRA_FAIL`
-  页面没有成功回传，或运行链路本身超时/异常
+  导航或驱动链路本身失败
 
-## 10. 页面错误是怎么采集的
+默认情况下，像 `favicon.ico` 404 这种浏览器噪音不会被判成 `FAIL`。
 
-当 URL 上带有这些参数时：
+## 8. 如何扩展
 
-- `compat_mode=1`
-- `compat_run_id=...`
-- `compat_report_url=http://127.0.0.1:PORT/report`
+新增 demo 页面时，通常同步改这几处：
 
-页面会启用测试态错误采集，并把结果 POST 回本地服务。
+1. `demo-pages/<slug>.html`
+2. `demo-pages/manifest.json`
+3. `compat-check.demo-suite.json`
 
-当前采集范围包括：
+如果是调分类逻辑，主要改：
 
-- `window.onerror`
-- `unhandledrejection`
-- `console.error`
+- `scripts/compat-check.js`
+  里的 `normalizeSafariConsoleEntry`
+- `isErrorLikeEntry`
 
-这意味着它不是去“抓 Safari 开发者工具控制台”，而是让页面自己把错误结构化上报回来。这样更稳定，也更容易后续迁移到真实项目。
+## 9. 常见问题
 
-## 11. 怎么接入真实页面
+### 1) `simctl` 失败
 
-推荐做法是给真实业务页加一个测试态：
+如果 `xcrun simctl list devices available -j` 失败，先修 Xcode / Simulator
+环境，不要先改 runner。
 
-1. 页面识别 `compat_mode=1`
-2. 开启错误采集
-3. 把错误放进结构化对象
-4. 用 `compat_report_url` 回传结果
+### 2) Appium 报缺少 `XCUITest` driver
 
-这样你之后只需要把配置里的 `targets` 改成真实 URL：
+说明 Appium server 是通的，但对应环境里没有安装 driver。
 
-```json
-{
-  "name": "checkout-page",
-  "url": "https://your-site.example/checkout?compat_mode=1"
-}
-```
-
-更稳妥的方式是：
-
-- 用 query 参数开启测试态
-- 不污染生产默认路径
-- 只在自动化测试时启用错误上报
-
-## 12. 推荐使用顺序
-
-建议你按这个顺序用：
-
-1. 先跑 `npm run compat:check`
-   确认最小链路可用
-2. 再跑 `npm run compat:demo-suite`
-   确认各种错误类型都能被识别
-3. 再把 `targets` 改成你自己的真实页面
-4. 最后再扩展到更多 runtime 或更低版本的 iOS
-
-## 13. 常见问题
-
-### 1) `simctl` 不能用
-
-先检查：
+执行：
 
 ```bash
-xcrun simctl list devices available
+appium driver install xcuitest
 ```
 
-如果这里就失败，先不要看工具代码，先修 Xcode / Simulator 环境。
+如果你连的是外部 Appium server，要装在那一份 Appium 环境里。
 
-### 2) 页面能打开但结果一直超时
+### 3) 为什么正常页面被判成 `FAIL`
 
-通常说明：
+先看 `*-safari-console.json`。
 
-- 页面没有启用测试态采集
-- 没有正确使用 `compat_report_url`
-- 页面逻辑把上报流程阻断了
+最常见原因是：
 
-### 3) 为什么不是直接读 Safari Console？
-
-因为直接抓 Safari Web Inspector 控制台更脆弱，更难自动化，也不利于后续迁移到真实项目和 CI。
-
-当前方案的核心思路是：
-
-- 用 Simulator + Safari 执行真实页面
-- 用页面内测试态逻辑回传结构化错误
-
-这样能更稳定地落地成长期可维护的测试工具。
+- 页面真的有 JS 错误
+- 过滤规则过宽
+- 你把 `appium.failOnNetworkErrors` 打开了

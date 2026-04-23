@@ -38,10 +38,8 @@
       <p>This page waits a bit longer, then throws an asynchronous runtime error.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
-          window.__compatRuntimeReady = true;
         }, 300);
         setTimeout(() => {
           throw new Error("compat demo delayed runtime error");

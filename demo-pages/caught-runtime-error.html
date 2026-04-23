@@ -38,7 +38,6 @@
       <p>This page throws inside <code>try/catch</code> and swallows the error, so the global collector should not see it.</p>
     </main>
     <script>
-      window.__compatRuntimeReady = false;
       window.addEventListener("load", () => {
         setTimeout(() => {
           try {
@@ -47,7 +46,6 @@
           } catch (error) {
             document.body.insertAdjacentHTML("beforeend", "<p>caught: " + error.message + "</p>");
           }
-          window.__compatRuntimeReady = true;
         }, 300);
       });
     </script>
