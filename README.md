@@ -118,6 +118,8 @@ appium driver install xcuitest
 重点字段：
 
 - `simulatorName`
+  首选 simulator 名称。找不到精确匹配时，会自动退到同一 `runtimePrefix`
+  下可用的 iPhone Simulator；如果没有 iPhone，会退到任意可用 simulator。
 - `runtimePrefix`
 - `loadTimeoutMs`
 - `settleTimeMs`

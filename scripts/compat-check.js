@@ -126,6 +126,45 @@ function extractPlatformVersion(runtimeName) {
   return match ? match[1] : null;
 }
 
+function toDeviceCandidate(device, runtimeId, runtime) {
+  return {
+    udid: device.udid,
+    name: device.name,
+    state: device.state,
+    deviceTypeIdentifier: device.deviceTypeIdentifier || null,
+    runtimeIdentifier: runtimeId,
+    runtimeName: runtime.name,
+    platformVersion: extractPlatformVersion(runtime.name),
+  };
+}
+
+function isIphoneCandidate(candidate) {
+  return (
+    String(candidate.deviceTypeIdentifier || "").includes(".iPhone-") ||
+    /^iPhone\b/.test(String(candidate.name || ""))
+  );
+}
+
+function compareDevicePreference(left, right) {
+  const leftBooted = left.state === "Booted" ? 1 : 0;
+  const rightBooted = right.state === "Booted" ? 1 : 0;
+  if (leftBooted !== rightBooted) {
+    return rightBooted - leftBooted;
+  }
+
+  const leftVersion = Number.parseFloat(left.platformVersion || "0");
+  const rightVersion = Number.parseFloat(right.platformVersion || "0");
+  if (Number.isFinite(leftVersion) && Number.isFinite(rightVersion) && leftVersion !== rightVersion) {
+    return rightVersion - leftVersion;
+  }
+
+  return String(left.name || "").localeCompare(String(right.name || ""));
+}
+
+function describeDevice(candidate) {
+  return `${candidate.name} (${candidate.runtimeName}, ${candidate.state})`;
+}
+
 function pickDevice(simulatorName, runtimePrefix) {
   const devicesByRuntime = getDevices();
   const runtimes = getRuntimes();
@@ -146,30 +185,47 @@ function pickDevice(simulatorName, runtimePrefix) {
       if (!device.isAvailable) {
         continue;
       }
-      if (device.name === simulatorName) {
-        candidates.push({
-          udid: device.udid,
-          name: device.name,
-          state: device.state,
-          runtimeIdentifier: runtimeId,
-          runtimeName: runtime.name,
-          platformVersion: extractPlatformVersion(runtime.name),
-        });
-      }
+      candidates.push(toDeviceCandidate(device, runtimeId, runtime));
     }
   }
 
-  if (candidates.length === 0) {
+  const exactCandidates = candidates
+    .filter((candidate) => candidate.name === simulatorName)
+    .sort(compareDevicePreference);
+  if (exactCandidates.length > 0) {
+    return exactCandidates[0];
+  }
+
+  const iphoneCandidates = candidates
+    .filter((candidate) => isIphoneCandidate(candidate))
+    .sort(compareDevicePreference);
+  if (iphoneCandidates.length > 0) {
+    return {
+      ...iphoneCandidates[0],
+      requestedSimulatorName: simulatorName,
+      simulatorNameFallback: true,
+    };
+  }
+
+  const fallbackCandidates = candidates.sort(compareDevicePreference);
+  if (fallbackCandidates.length > 0) {
+    return {
+      ...fallbackCandidates[0],
+      requestedSimulatorName: simulatorName,
+      simulatorNameFallback: true,
+    };
+  }
+
+  {
     const availableRuntimes = runtimes
       .filter((runtime) => runtime.isAvailable)
       .map((runtime) => runtime.name)
       .join(", ");
+    const availableDevices = candidates.map(describeDevice).join(", ") || "none";
     throw new Error(
-      `No available simulator matched name "${simulatorName}" with runtime prefix "${runtimePrefix}". Available runtimes: ${availableRuntimes}`,
+      `No available simulator matched name "${simulatorName}" with runtime prefix "${runtimePrefix}", and no fallback simulator was available. Available devices for matching runtimes: ${availableDevices}. Available runtimes: ${availableRuntimes}`,
     );
   }
-
-  return candidates[0];
 }
 
 function bootDevice(udid) {
@@ -907,6 +963,8 @@ function writeArtifacts(config, device, results) {
       udid: device.udid,
       runtimeName: device.runtimeName,
       runtimeIdentifier: device.runtimeIdentifier,
+      requestedName: device.requestedSimulatorName || config.simulatorName,
+      fallbackUsed: Boolean(device.simulatorNameFallback),
     },
     collector: "appium:safariConsole",
     appium: {
@@ -930,6 +988,9 @@ function writeArtifacts(config, device, results) {
     "# compat-check results",
     "",
     `- Simulator: ${device.name}`,
+    ...(device.simulatorNameFallback
+      ? [`- Requested simulator: ${device.requestedSimulatorName}`]
+      : []),
     `- Runtime: ${device.runtimeName}`,
     `- Collector: appium:safariConsole`,
     `- Appium server: ${config.appium.serverUrl}`,
@@ -966,6 +1027,9 @@ function printSummary(device, artifactDir, results) {
 
   process.stdout.write("\ncompat-check finished\n");
   process.stdout.write(`- simulator:  ${device.name}\n`);
+  if (device.simulatorNameFallback) {
+    process.stdout.write(`- requested:  ${device.requestedSimulatorName}\n`);
+  }
   process.stdout.write(`- runtime:    ${device.runtimeName}\n`);
   process.stdout.write(`- collector:  appium:safariConsole\n`);
   process.stdout.write(`- artifacts:  ${artifactDir}\n`);
@@ -1027,6 +1091,11 @@ async function main() {
 
   try {
     device = pickDevice(config.simulatorName, config.runtimePrefix);
+    if (device.simulatorNameFallback) {
+      process.stderr.write(
+        `Requested simulator "${device.requestedSimulatorName}" was not available; using "${device.name}" (${device.runtimeName}) instead.\n`,
+      );
+    }
     bootDevice(device.udid);
 
     if (config.targets.some((target) => target.type === "demo")) {

@@ -130,6 +130,8 @@ sequenceDiagram
   - `bootDevice`
   - `shutdownDevice`
 
+`pickDevice` 会优先选择配置中的 `simulatorName`。如果本机没有这个设备名，会自动 fallback 到同一 `runtimePrefix` 下可用的 iPhone simulator；如果没有 iPhone，则使用同一 runtime 前缀下任意可用 simulator。发生 fallback 时，CLI 和产物会记录 requested simulator 与实际使用的 simulator。
+
 - Appium 通信
   - `requestJson`
   - `ensureAppiumServer`
